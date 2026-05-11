@@ -1,0 +1,56 @@
+site: la_ligua
+
+agent:
+  mode: passive-listening
+  sub_mode: store
+  store_timeout_seconds: 120
+  test_duration_seconds: 60
+  test_only_valid_crc: false
+
+nports:
+  - name: np5232i_745_port01_piranometros
+    host: 127.0.0.1
+    port: 14001
+    device_type: kipp_zonen
+    idle_gap_ms: 200
+    serial:
+      baud: 19200
+      data_bits: 8
+      parity: even
+      stop_bits: 1
+    dial_timeout_ms: 2000
+    reconnect_delay_ms: 1000
+    read_buffer_bytes: 1024
+    log_frame_hex: true
+    max_frame_bytes: 4096
+    connection_keep_log: false
+    skip_invalid_crc: false
+    detected_slaves:
+      - 4
+      - 5
+      - 7
+      - 8
+    slaves:
+      # kipp_zonen: 43 int16 registers, value0..value42.
+      - name: piranometro_4
+        address: 4
+      - name: piranometro_5
+        address: 5
+      - name: piranometro_7
+        address: 7
+      - name: piranometro_8
+        address: 8
+
+storage:
+  outputs:
+    - name: local_timescale_shadow
+      type: timescaledb_shadow
+      enabled: true
+      timescaledb_shadow:
+        host_env: TIMESCALE_HOST_LOCAL
+        port_env: TIMESCALE_PORT_LOCAL
+        user_env: TIMESCALE_USER_LOCAL
+        password_env: TIMESCALE_PASSWORD_LOCAL
+        database_env: TIMESCALE_DB_LOCAL
+        schema: edge
+        table: nport_acquisition_shadow

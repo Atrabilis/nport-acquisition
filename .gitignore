@@ -7,5 +7,6 @@ bin/
 dist/
 /nport-agent
 coverage.out
+runs/
 test/
 tmp/

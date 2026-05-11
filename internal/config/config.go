@@ -70,6 +70,10 @@ type StorageOutputConfig struct {
 	TimescaledbShadow TimescaledbShadowConfig `yaml:"timescaledb_shadow,omitempty"`
 }
 
+func (o StorageOutputConfig) IsEnabled() bool {
+	return o.Enabled == nil || *o.Enabled
+}
+
 type TimescaledbShadowConfig struct {
 	HostEnv     string `yaml:"host_env"`
 	PortEnv     string `yaml:"port_env"`

@@ -14,7 +14,11 @@ import (
 	"github.com/Atrabilis/nport-acquisition/internal/modbusrtu"
 )
 
-func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveCollector) {
+type FrameRecorder interface {
+	RecordFrame(nport config.NPortConfig, slaveID uint8, slaveName string, values []RegisterValue, ts time.Time)
+}
+
+func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveCollector, recorder FrameRecorder) {
 	addr := net.JoinHostPort(nport.Host, strconv.Itoa(nport.Port))
 	idleGap := deriveIdleGap(nport, 5*time.Millisecond)
 	reconnectDelay := durationOrDefault(nport.ReconnectDelayMS, 2*time.Second)
@@ -45,7 +49,7 @@ func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveColle
 		}
 
 		fmt.Printf("[%s] connected to %s\n", nport.Name, addr)
-		if err := streamFrames(ctx, conn, nport, idleGap, readBufSize, maxFrame, collector); err != nil {
+		if err := streamFrames(ctx, conn, nport, idleGap, readBufSize, maxFrame, collector, recorder); err != nil {
 			fmt.Printf("[%s] connection closed: %v\n", nport.Name, err)
 		}
 		_ = conn.Close()
@@ -58,7 +62,7 @@ func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveColle
 	}
 }
 
-func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, idleGap time.Duration, readBufSize int, maxFrame int, collector *SlaveCollector) error {
+func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, idleGap time.Duration, readBufSize int, maxFrame int, collector *SlaveCollector, recorder FrameRecorder) error {
 	buf := make([]byte, readBufSize)
 	var frame []byte
 
@@ -72,7 +76,7 @@ func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, 
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				if len(frame) > 0 {
-					logFrame(nport, frame, collector)
+					logFrame(nport, frame, collector, recorder)
 					frame = frame[:0]
 				} else if nport.ConnectionKeepLog {
 					fmt.Printf("[%s] idle\n", nport.Name)
@@ -87,17 +91,26 @@ func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, 
 
 		frame = append(frame, buf[:n]...)
 		if len(frame) >= maxFrame {
-			logFrame(nport, frame, collector)
+			logFrame(nport, frame, collector, recorder)
 			frame = frame[:0]
 		}
 	}
 }
 
-func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector) {
+func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector, recorder FrameRecorder) {
 	if len(frame) == 0 {
 		return
 	}
+	frames := splitResponseFrames(frame)
+	if len(frames) > 1 {
+		fmt.Printf("[%s] split aggregated frame len=%d into %d modbus responses\n", nport.Name, len(frame), len(frames))
+	}
+	for _, part := range frames {
+		logSingleFrame(nport, part, collector, recorder)
+	}
+}
 
+func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector, recorder FrameRecorder) {
 	summary := modbusrtu.Summarize(frame)
 	if nport.SkipInvalidCRC && (summary.CRCValid == nil || !*summary.CRCValid) {
 		return
@@ -109,6 +122,8 @@ func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector)
 	var dataDec string
 	var parserLines []string
 	var registerLines []string
+	var slaveName string
+	var values []RegisterValue
 	if summary.CRCValid != nil && *summary.CRCValid && len(frame) > 4 {
 		start := 2
 		if summary.ByteCount != nil {
@@ -119,9 +134,12 @@ func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector)
 			dataDec = fmt.Sprintf("%v", modbusrtu.DecimalBytes(data))
 			if summary.ByteCount != nil && *summary.ByteCount == len(data) && len(data)%2 == 0 {
 				parserLines = modbusrtu.RegisterParserLines(data)
-				_, registerLines, _ = decodeKnownRegisters(nport, summary.SlaveID, data)
+				slaveName, registerLines, values = decodeKnownRegisters(nport, summary.SlaveID, data)
 			}
 		}
+	}
+	if recorder != nil && len(values) > 0 {
+		recorder.RecordFrame(nport, summary.SlaveID, slaveName, values, time.Now().UTC())
 	}
 
 	header := fmt.Sprintf("[%s] frame: %s", nport.Name, modbusrtu.FormatSummary(summary))
@@ -130,22 +148,43 @@ func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector)
 	}
 
 	lines := []string{header}
-	if dataDec != "" {
+	if nport.LogFrameHex && dataDec != "" {
 		lines = append(lines, "  data_dec: "+dataDec)
 	}
-	if len(parserLines) > 0 {
+	if nport.LogFrameHex && len(parserLines) > 0 {
 		lines = append(lines, "  parsers:")
 		for _, parserLine := range parserLines {
 			lines = append(lines, "    "+parserLine)
 		}
 	}
-	if len(registerLines) > 0 {
+	if nport.LogFrameHex && len(registerLines) > 0 {
 		lines = append(lines, "  registers:")
 		for _, registerLine := range registerLines {
 			lines = append(lines, "    "+registerLine)
 		}
 	}
 	fmt.Println(strings.Join(lines, "\n"))
+}
+
+func splitResponseFrames(frame []byte) [][]byte {
+	if len(frame) < 5 {
+		return [][]byte{frame}
+	}
+
+	parts := make([][]byte, 0, 2)
+	for offset := 0; offset < len(frame); {
+		if len(frame)-offset < 5 {
+			return [][]byte{frame}
+		}
+		byteCount := int(frame[offset+2])
+		frameLen := byteCount + 5
+		if frameLen < 5 || offset+frameLen > len(frame) {
+			return [][]byte{frame}
+		}
+		parts = append(parts, frame[offset:offset+frameLen])
+		offset += frameLen
+	}
+	return parts
 }
 
 func durationOrDefault(ms int, fallback time.Duration) time.Duration {

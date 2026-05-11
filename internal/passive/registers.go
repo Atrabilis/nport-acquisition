@@ -2,6 +2,7 @@ package passive
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Atrabilis/nport-acquisition/internal/config"
@@ -27,6 +28,12 @@ func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) 
 		}
 	}
 	if slave == nil || len(slave.Registers) == 0 {
+		if slave == nil {
+			return "", nil, nil
+		}
+		slave.Registers = defaultRegistersForDevice(nport.DeviceType)
+	}
+	if len(slave.Registers) == 0 {
 		return "", nil, nil
 	}
 
@@ -69,4 +76,37 @@ func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) 
 	}
 
 	return slave.Name, lines, values
+}
+
+func defaultRegistersForDevice(deviceType string) []config.RegisterConfig {
+	switch normalizeDeviceType(deviceType) {
+	case "kipp_zonen":
+		return sequentialInt16Registers(43)
+	default:
+		return nil
+	}
+}
+
+func normalizeDeviceType(deviceType string) string {
+	normalized := strings.ToLower(strings.TrimSpace(deviceType))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	normalized = strings.ReplaceAll(normalized, " ", "_")
+	switch normalized {
+	case "kipp_zonnen", "kippzonen", "kipp_zonen":
+		return "kipp_zonen"
+	default:
+		return normalized
+	}
+}
+
+func sequentialInt16Registers(count int) []config.RegisterConfig {
+	registers := make([]config.RegisterConfig, 0, count)
+	for i := 0; i < count; i++ {
+		registers = append(registers, config.RegisterConfig{
+			Register:     i,
+			RegisterName: "value" + strconv.Itoa(i),
+			RegisterType: "int16",
+		})
+	}
+	return registers
 }
