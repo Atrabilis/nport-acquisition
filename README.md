@@ -23,3 +23,4 @@ Unificar los scripts hechos por planta en un agente configurable, con:
 Tomar una configuracion existente, por ejemplo Petorca, y convertirla en una plantilla sin tokens. Despues se migra la logica Go actual al layout nuevo manteniendo compatibilidad con el YAML mientras ordenamos el modelo de configuracion.
 
 El despliegue Ansible vive en `/home/angel/atamostec/ansible-infra`.
+El contrato de secretos esta descrito en `docs/secrets.md`.

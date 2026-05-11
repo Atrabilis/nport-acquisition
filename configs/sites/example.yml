@@ -32,10 +32,16 @@ storage:
   local:
     - name: local-influx
       db-type: influxdb2
-      db-url: http://localhost:8086
-      db-token-env: INFLUXDB_LOCAL_TOKEN
-      db-org: atamostec
-      db-bucket: example
+      db-url-env: INFLUX_HOST_LOCAL
+      db-token-env: INFLUX_TOKEN_LOCAL
+      db-org-env: INFLUX_ORG_LOCAL
+      db-bucket-env: INFLUX_BUCKET_LOCAL
       db-measurement: example-nport
-  remotes: []
-
+  remotes:
+    - name: remote-influx
+      db-type: influxdb2
+      db-url-env: INFLUX_HOST_REMOTE
+      db-token-env: INFLUX_TOKEN_REMOTE
+      db-org-env: INFLUX_ORG_REMOTE
+      db-bucket-env: INFLUX_BUCKET_REMOTE
+      db-measurement: example-nport
