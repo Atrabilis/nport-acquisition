@@ -1,0 +1,81 @@
+---
+- name: Validate deployment inputs
+  ansible.builtin.assert:
+    that:
+      - nport_acquisition_binary_src | length > 0
+      - nport_acquisition_config_src | length > 0
+    fail_msg: Set nport_acquisition_binary_src and nport_acquisition_config_src for this host or group.
+
+- name: Ensure nport group exists
+  ansible.builtin.group:
+    name: "{{ nport_acquisition_group }}"
+    system: true
+
+- name: Ensure nport user exists
+  ansible.builtin.user:
+    name: "{{ nport_acquisition_user }}"
+    group: "{{ nport_acquisition_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Ensure install and config directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default(nport_acquisition_user) }}"
+    group: "{{ item.group | default(nport_acquisition_group) }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ nport_acquisition_install_dir }}"
+      mode: "0755"
+    - path: "{{ nport_acquisition_config_dir }}"
+      mode: "0750"
+    - path: "{{ nport_acquisition_textfile_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+
+- name: Install nport acquisition binary
+  ansible.builtin.copy:
+    src: "{{ nport_acquisition_binary_src }}"
+    dest: "{{ nport_acquisition_binary }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart nport acquisition
+
+- name: Install nport acquisition config
+  ansible.builtin.copy:
+    src: "{{ nport_acquisition_config_src }}"
+    dest: "{{ nport_acquisition_config_file }}"
+    owner: root
+    group: "{{ nport_acquisition_group }}"
+    mode: "0640"
+  notify: Restart nport acquisition
+
+- name: Render environment file
+  ansible.builtin.template:
+    src: nport-acquisition.env.j2
+    dest: "{{ nport_acquisition_config_dir }}/agent.env"
+    owner: root
+    group: "{{ nport_acquisition_group }}"
+    mode: "0640"
+  notify: Restart nport acquisition
+
+- name: Render systemd unit
+  ansible.builtin.template:
+    src: nport-acquisition.service.j2
+    dest: "/etc/systemd/system/{{ nport_acquisition_service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart nport acquisition
+
+- name: Enable nport acquisition service
+  ansible.builtin.systemd:
+    name: "{{ nport_acquisition_service_name }}"
+    enabled: true
+    daemon_reload: true

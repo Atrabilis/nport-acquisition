@@ -1,0 +1,41 @@
+site: example
+
+agent:
+  mode: passive-listening
+  sub_mode: store
+  store_timeout_seconds: 30
+  test_duration_seconds: 60
+  test_only_valid_crc: false
+
+nports:
+  - name: port_1
+    host: 192.0.2.10
+    port: 4001
+    device_type: generic
+    idle_gap_ms: 50
+    serial:
+      baud: 19200
+      data_bits: 8
+      parity: even
+      stop_bits: 1
+    detected_slaves:
+      - 1
+    slaves:
+      - name: device_1
+        address: 1
+        registers:
+          - register: 0
+            register_name: value0
+            register_type: int16
+
+storage:
+  local:
+    - name: local-influx
+      db-type: influxdb2
+      db-url: http://localhost:8086
+      db-token-env: INFLUXDB_LOCAL_TOKEN
+      db-org: atamostec
+      db-bucket: example
+      db-measurement: example-nport
+  remotes: []
+

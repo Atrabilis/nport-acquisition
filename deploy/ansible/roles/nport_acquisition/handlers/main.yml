@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart nport acquisition
+  ansible.builtin.systemd:
+    name: "{{ nport_acquisition_service_name }}"
+    state: restarted
+

@@ -1,0 +1,7 @@
+---
+- name: Deploy NPort acquisition agent
+  hosts: nport_agents
+  become: true
+  roles:
+    - role: nport_acquisition
+

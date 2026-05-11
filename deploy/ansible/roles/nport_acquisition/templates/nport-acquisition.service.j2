@@ -1,0 +1,19 @@
+[Unit]
+Description=NPort acquisition agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ nport_acquisition_user }}
+Group={{ nport_acquisition_group }}
+EnvironmentFile={{ nport_acquisition_config_dir }}/agent.env
+ExecStart={{ nport_acquisition_binary }} -config {{ nport_acquisition_config_file }}
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

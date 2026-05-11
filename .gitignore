@@ -1,0 +1,10 @@
+.env
+*.local.yml
+*.local.yaml
+*.secret.yml
+*.secret.yaml
+bin/
+dist/
+coverage.out
+tmp/
+
