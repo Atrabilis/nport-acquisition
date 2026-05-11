@@ -2,7 +2,7 @@ site: example
 
 agent:
   mode: passive-listening
-  sub_mode: store
+  sub_mode: read-only
   store_timeout_seconds: 30
   test_duration_seconds: 60
   test_only_valid_crc: false

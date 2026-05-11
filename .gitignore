@@ -5,6 +5,7 @@
 *.secret.yaml
 bin/
 dist/
+/nport-agent
 coverage.out
+test/
 tmp/
-
