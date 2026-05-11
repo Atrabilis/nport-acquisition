@@ -8,22 +8,18 @@ Las configuraciones de NPort deben referenciar variables de entorno para credenc
 
 ```yaml
 storage:
-  local:
-    - name: local
-      db-type: influxdb2
-      db-url-env: INFLUX_HOST_LOCAL
-      db-token-env: INFLUX_TOKEN_LOCAL
-      db-org-env: INFLUX_ORG_LOCAL
-      db-bucket-env: INFLUX_BUCKET_LOCAL
-      db-measurement: petorca-stationmeteo-np1
-  remotes:
-    - name: remote
-      db-type: influxdb2
-      db-url-env: INFLUX_HOST_REMOTE
-      db-token-env: INFLUX_TOKEN_REMOTE
-      db-org-env: INFLUX_ORG_REMOTE
-      db-bucket-env: INFLUX_BUCKET_REMOTE
-      db-measurement: petorca-stationmeteo-np1
+  outputs:
+    - name: local_timescale_shadow
+      type: timescaledb_shadow
+      enabled: true
+      timescaledb_shadow:
+        host_env: TIMESCALE_HOST_LOCAL
+        port_env: TIMESCALE_PORT_LOCAL
+        user_env: TIMESCALE_USER_LOCAL
+        password_env: TIMESCALE_PASSWORD_LOCAL
+        database_env: TIMESCALE_DB_LOCAL
+        schema: edge
+        table: petorca_stationmeteo_np1_shadow
 ```
 
 ## Fuente de verdad
@@ -31,7 +27,7 @@ storage:
 Los secretos viven en Ansible Vault dentro de `ansible-infra`:
 
 - `inventories/prod_inventory/vaults/influx.yml`
+- `inventories/prod_inventory/vaults/timescale.yml`
 - `inventories/prod_inventory/vaults/hosts/{{ inventory_hostname }}.yml`
 
-El rol `deploy_nport_acquisition` renderiza un archivo `.env` con variables `INFLUX_*`.
-
+El rol `deploy_nport_acquisition` renderiza un archivo `.env` con variables `INFLUX_*` y `TIMESCALE_*`.

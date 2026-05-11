@@ -24,3 +24,4 @@ Tomar una configuracion existente, por ejemplo Petorca, y convertirla en una pla
 
 El despliegue Ansible vive en `/home/angel/atamostec/ansible-infra`.
 El contrato de secretos esta descrito en `docs/secrets.md`.
+El contrato de Timescale shadow esta descrito en `docs/timescale-shadow.md`.
