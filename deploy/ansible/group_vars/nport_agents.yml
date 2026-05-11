@@ -1,8 +1,0 @@
----
-# Example values. Override these per environment, host, or CI pipeline.
-nport_acquisition_binary_src: ../../dist/nport-agent-linux-amd64
-nport_acquisition_config_src: ../../configs/sites/example.yml
-
-nport_acquisition_env:
-  INFLUXDB_LOCAL_TOKEN: "replace-me-outside-git"
-

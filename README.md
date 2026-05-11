@@ -16,10 +16,10 @@ Unificar los scripts hechos por planta en un agente configurable, con:
 - `cmd/nport-agent/`: punto de entrada futuro del agente Go.
 - `internal/`: paquetes internos del agente.
 - `configs/sites/`: plantillas y ejemplos de configuracion por planta.
-- `deploy/ansible/`: inventories, playbooks y roles de despliegue.
 - `docs/`: notas de migracion y decisiones de diseno.
 
 ## Proximo paso sugerido
 
 Tomar una configuracion existente, por ejemplo Petorca, y convertirla en una plantilla sin tokens. Despues se migra la logica Go actual al layout nuevo manteniendo compatibilidad con el YAML mientras ordenamos el modelo de configuracion.
 
+El despliegue Ansible vive en `/home/angel/atamostec/ansible-infra`.

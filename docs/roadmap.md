@@ -14,9 +14,10 @@
 
 ## Paso 3: Ansible
 
+- Mantener el rol/playbook en `/home/angel/atamostec/ansible-infra`.
 - Instalar binario del agente.
 - Renderizar configuracion por host/planta.
-- Crear servicio systemd.
+- Crear servicio systemd/timer.
 - Configurar directorio textfile collector de node_exporter.
 
 ## Paso 4: endurecimiento
@@ -25,4 +26,3 @@
 - Validacion de YAML.
 - Modo dry-run para validar config sin conectar a NPorts.
 - Logs estructurados.
-
