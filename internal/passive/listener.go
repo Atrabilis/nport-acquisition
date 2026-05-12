@@ -31,6 +31,7 @@ func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveColle
 	if maxFrame <= 0 {
 		maxFrame = 4096
 	}
+	decoder := NewFrameDecoder(nport)
 
 	for {
 		if ctx.Err() != nil {
@@ -49,7 +50,7 @@ func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveColle
 		}
 
 		fmt.Printf("[%s] connected to %s\n", nport.Name, addr)
-		if err := streamFrames(ctx, conn, nport, idleGap, readBufSize, maxFrame, collector, recorder); err != nil {
+		if err := streamFrames(ctx, conn, nport, idleGap, readBufSize, maxFrame, collector, recorder, decoder); err != nil {
 			fmt.Printf("[%s] connection closed: %v\n", nport.Name, err)
 		}
 		_ = conn.Close()
@@ -62,7 +63,7 @@ func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveColle
 	}
 }
 
-func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, idleGap time.Duration, readBufSize int, maxFrame int, collector *SlaveCollector, recorder FrameRecorder) error {
+func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, idleGap time.Duration, readBufSize int, maxFrame int, collector *SlaveCollector, recorder FrameRecorder, decoder *FrameDecoder) error {
 	buf := make([]byte, readBufSize)
 	var frame []byte
 
@@ -76,7 +77,7 @@ func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, 
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				if len(frame) > 0 {
-					logFrame(nport, frame, collector, recorder)
+					logFrame(nport, frame, collector, recorder, decoder)
 					frame = frame[:0]
 				} else if nport.ConnectionKeepLog {
 					fmt.Printf("[%s] idle\n", nport.Name)
@@ -91,13 +92,13 @@ func streamFrames(ctx context.Context, conn net.Conn, nport config.NPortConfig, 
 
 		frame = append(frame, buf[:n]...)
 		if len(frame) >= maxFrame {
-			logFrame(nport, frame, collector, recorder)
+			logFrame(nport, frame, collector, recorder, decoder)
 			frame = frame[:0]
 		}
 	}
 }
 
-func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector, recorder FrameRecorder) {
+func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector, recorder FrameRecorder, decoder *FrameDecoder) {
 	if len(frame) == 0 {
 		return
 	}
@@ -106,11 +107,11 @@ func logFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector,
 		fmt.Printf("[%s] split aggregated frame len=%d into %d modbus responses\n", nport.Name, len(frame), len(frames))
 	}
 	for _, part := range frames {
-		logSingleFrame(nport, part, collector, recorder)
+		logSingleFrame(nport, part, collector, recorder, decoder)
 	}
 }
 
-func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector, recorder FrameRecorder) {
+func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveCollector, recorder FrameRecorder, decoder *FrameDecoder) {
 	summary := modbusrtu.Summarize(frame)
 	if nport.SkipInvalidCRC && (summary.CRCValid == nil || !*summary.CRCValid) {
 		return
@@ -125,6 +126,7 @@ func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveColl
 	var slaveName string
 	var deviceType string
 	var values []RegisterValue
+	var decoderLines []string
 	if summary.CRCValid != nil && *summary.CRCValid && len(frame) > 4 {
 		start := 2
 		if summary.ByteCount != nil {
@@ -135,7 +137,9 @@ func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveColl
 			dataDec = fmt.Sprintf("%v", modbusrtu.DecimalBytes(data))
 			if summary.ByteCount != nil && *summary.ByteCount == len(data) && len(data)%2 == 0 {
 				parserLines = modbusrtu.RegisterParserLines(data)
-				slaveName, deviceType, registerLines, values = decodeKnownRegisters(nport, summary.SlaveID, data)
+				if decoder != nil {
+					slaveName, deviceType, registerLines, values, decoderLines = decoder.DecodeFrame(summary, frame, data)
+				}
 			}
 		}
 	}
@@ -163,6 +167,9 @@ func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveColl
 		for _, registerLine := range registerLines {
 			lines = append(lines, "    "+registerLine)
 		}
+	}
+	if len(decoderLines) > 0 {
+		lines = append(lines, decoderLines...)
 	}
 	fmt.Println(strings.Join(lines, "\n"))
 }

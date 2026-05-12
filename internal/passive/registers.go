@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Atrabilis/nport-acquisition/internal/config"
+	"github.com/Atrabilis/nport-acquisition/internal/modbusrtu"
 )
 
 type RegisterValue struct {
@@ -15,18 +16,44 @@ type RegisterValue struct {
 	Value    float64
 }
 
+type FrameDecoder struct {
+	nport  config.NPortConfig
+	dustIQ map[uint8]*dustIQCycle
+}
+
+func NewFrameDecoder(nport config.NPortConfig) *FrameDecoder {
+	return &FrameDecoder{
+		nport:  nport,
+		dustIQ: make(map[uint8]*dustIQCycle),
+	}
+}
+
+func (d *FrameDecoder) DecodeFrame(summary modbusrtu.Summary, frame []byte, data []byte) (string, string, []string, []RegisterValue, []string) {
+	if d == nil {
+		return "", "", nil, nil, nil
+	}
+	slave := slaveConfigForID(d.nport, summary.SlaveID)
+	if slave == nil {
+		return "", "", nil, nil, nil
+	}
+
+	deviceType := effectiveDeviceType(d.nport, *slave)
+	switch normalizeDeviceType(deviceType) {
+	case "dustiq":
+		registerLines, values, decoderLines := d.decodeDustIQFrame(summary, frame, *slave)
+		return slave.Name, deviceType, registerLines, values, decoderLines
+	default:
+		slaveName, effectiveType, registerLines, values := decodeKnownRegisters(d.nport, summary.SlaveID, data)
+		return slaveName, effectiveType, registerLines, values, nil
+	}
+}
+
 func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) (string, string, []string, []RegisterValue) {
 	if len(data)%2 != 0 || len(nport.Slaves) == 0 {
 		return "", "", nil, nil
 	}
 
-	var slave *config.SlaveConfig
-	for i := range nport.Slaves {
-		if nport.Slaves[i].Address == slaveID {
-			slave = &nport.Slaves[i]
-			break
-		}
-	}
+	slave := slaveConfigForID(nport, slaveID)
 	if slave == nil || len(slave.Registers) == 0 {
 		if slave == nil {
 			return "", "", nil, nil
@@ -78,6 +105,15 @@ func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) 
 	return slave.Name, effectiveDeviceType(nport, *slave), lines, values
 }
 
+func slaveConfigForID(nport config.NPortConfig, slaveID uint8) *config.SlaveConfig {
+	for i := range nport.Slaves {
+		if nport.Slaves[i].Address == slaveID {
+			return &nport.Slaves[i]
+		}
+	}
+	return nil
+}
+
 func effectiveDeviceType(nport config.NPortConfig, slave config.SlaveConfig) string {
 	if strings.TrimSpace(slave.DeviceType) != "" {
 		return slave.DeviceType
@@ -101,6 +137,8 @@ func normalizeDeviceType(deviceType string) string {
 	switch normalized {
 	case "kipp_zonnen", "kippzonen", "kipp_zonen":
 		return "kipp_zonen"
+	case "dust_iq", "dust-iq", "dustiq":
+		return "dustiq"
 	default:
 		return normalized
 	}
