@@ -17,14 +17,16 @@ type RegisterValue struct {
 }
 
 type FrameDecoder struct {
-	nport  config.NPortConfig
-	dustIQ map[uint8]*dustIQCycle
+	nport    config.NPortConfig
+	dustIQ   map[uint8]*dustIQCycle
+	lufftWSX map[uint8]*lufftWSXCycle
 }
 
 func NewFrameDecoder(nport config.NPortConfig) *FrameDecoder {
 	return &FrameDecoder{
-		nport:  nport,
-		dustIQ: make(map[uint8]*dustIQCycle),
+		nport:    nport,
+		dustIQ:   make(map[uint8]*dustIQCycle),
+		lufftWSX: make(map[uint8]*lufftWSXCycle),
 	}
 }
 
@@ -41,6 +43,9 @@ func (d *FrameDecoder) DecodeFrame(summary modbusrtu.Summary, frame []byte, data
 	switch normalizeDeviceType(deviceType) {
 	case "dustiq":
 		registerLines, values, decoderLines := d.decodeDustIQFrame(summary, frame, *slave)
+		return slave.Name, deviceType, registerLines, values, decoderLines
+	case "lufft_wsx":
+		registerLines, values, decoderLines := d.decodeLufftWSXFrame(summary, frame, *slave)
 		return slave.Name, deviceType, registerLines, values, decoderLines
 	default:
 		slaveName, effectiveType, registerLines, values := decodeKnownRegisters(d.nport, summary.SlaveID, data)
@@ -139,6 +144,8 @@ func normalizeDeviceType(deviceType string) string {
 		return "kipp_zonen"
 	case "dust_iq", "dust-iq", "dustiq":
 		return "dustiq"
+	case "lufftwsx", "lufft_wsx", "lufft-wsx", "lufft":
+		return "lufft_wsx"
 	default:
 		return normalized
 	}
