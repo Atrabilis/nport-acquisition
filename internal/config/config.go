@@ -47,9 +47,10 @@ type SerialSettings struct {
 }
 
 type SlaveConfig struct {
-	Address   uint8            `yaml:"address"`
-	Name      string           `yaml:"name"`
-	Registers []RegisterConfig `yaml:"registers"`
+	Address    uint8            `yaml:"address"`
+	Name       string           `yaml:"name"`
+	DeviceType string           `yaml:"device_type"`
+	Registers  []RegisterConfig `yaml:"registers"`
 }
 
 type RegisterConfig struct {

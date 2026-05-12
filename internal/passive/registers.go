@@ -15,9 +15,9 @@ type RegisterValue struct {
 	Value    float64
 }
 
-func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) (string, []string, []RegisterValue) {
+func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) (string, string, []string, []RegisterValue) {
 	if len(data)%2 != 0 || len(nport.Slaves) == 0 {
-		return "", nil, nil
+		return "", "", nil, nil
 	}
 
 	var slave *config.SlaveConfig
@@ -29,12 +29,12 @@ func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) 
 	}
 	if slave == nil || len(slave.Registers) == 0 {
 		if slave == nil {
-			return "", nil, nil
+			return "", "", nil, nil
 		}
-		slave.Registers = defaultRegistersForDevice(nport.DeviceType)
+		slave.Registers = defaultRegistersForDevice(effectiveDeviceType(nport, *slave))
 	}
 	if len(slave.Registers) == 0 {
-		return "", nil, nil
+		return "", effectiveDeviceType(nport, *slave), nil, nil
 	}
 
 	lines := make([]string, 0, len(slave.Registers))
@@ -75,7 +75,14 @@ func decodeKnownRegisters(nport config.NPortConfig, slaveID uint8, data []byte) 
 		}
 	}
 
-	return slave.Name, lines, values
+	return slave.Name, effectiveDeviceType(nport, *slave), lines, values
+}
+
+func effectiveDeviceType(nport config.NPortConfig, slave config.SlaveConfig) string {
+	if strings.TrimSpace(slave.DeviceType) != "" {
+		return slave.DeviceType
+	}
+	return nport.DeviceType
 }
 
 func defaultRegistersForDevice(deviceType string) []config.RegisterConfig {

@@ -30,11 +30,12 @@ type Coordinator struct {
 }
 
 type storedFrame struct {
-	nport     config.NPortConfig
-	slaveID   uint8
-	slaveName string
-	values    []passive.RegisterValue
-	ts        time.Time
+	nport      config.NPortConfig
+	slaveID    uint8
+	slaveName  string
+	deviceType string
+	values     []passive.RegisterValue
+	ts         time.Time
 }
 
 func NewCoordinator(cfg config.Config, writers []Writer, cancel context.CancelFunc) *Coordinator {
@@ -74,7 +75,7 @@ func (c *Coordinator) Close() {
 	}
 }
 
-func (c *Coordinator) RecordFrame(nport config.NPortConfig, slaveID uint8, slaveName string, values []passive.RegisterValue, ts time.Time) {
+func (c *Coordinator) RecordFrame(nport config.NPortConfig, slaveID uint8, slaveName string, deviceType string, values []passive.RegisterValue, ts time.Time) {
 	if c == nil || len(values) == 0 {
 		return
 	}
@@ -96,11 +97,12 @@ func (c *Coordinator) RecordFrame(nport config.NPortConfig, slaveID uint8, slave
 		c.last[nport.Name] = make(map[uint8]storedFrame)
 	}
 	c.last[nport.Name][slaveID] = storedFrame{
-		nport:     nport,
-		slaveID:   slaveID,
-		slaveName: slaveName,
-		values:    values,
-		ts:        ts,
+		nport:      nport,
+		slaveID:    slaveID,
+		slaveName:  slaveName,
+		deviceType: deviceType,
+		values:     values,
+		ts:         ts,
 	}
 	fmt.Printf("[store] captured port=%s slave=%d slave_name=%s values=%d\n", nport.Name, slaveID, slaveName, len(values))
 
@@ -151,7 +153,7 @@ func (c *Coordinator) flushLocked() {
 				SlaveID:    frame.slaveID,
 				Fields:     fields,
 				Tags: map[string]string{
-					"device_type": frame.nport.DeviceType,
+					"device_type": frame.deviceType,
 				},
 			}
 			if err := writer.Write(context.Background(), row); err != nil {

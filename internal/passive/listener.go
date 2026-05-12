@@ -15,7 +15,7 @@ import (
 )
 
 type FrameRecorder interface {
-	RecordFrame(nport config.NPortConfig, slaveID uint8, slaveName string, values []RegisterValue, ts time.Time)
+	RecordFrame(nport config.NPortConfig, slaveID uint8, slaveName string, deviceType string, values []RegisterValue, ts time.Time)
 }
 
 func Listen(ctx context.Context, nport config.NPortConfig, collector *SlaveCollector, recorder FrameRecorder) {
@@ -123,6 +123,7 @@ func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveColl
 	var parserLines []string
 	var registerLines []string
 	var slaveName string
+	var deviceType string
 	var values []RegisterValue
 	if summary.CRCValid != nil && *summary.CRCValid && len(frame) > 4 {
 		start := 2
@@ -134,12 +135,12 @@ func logSingleFrame(nport config.NPortConfig, frame []byte, collector *SlaveColl
 			dataDec = fmt.Sprintf("%v", modbusrtu.DecimalBytes(data))
 			if summary.ByteCount != nil && *summary.ByteCount == len(data) && len(data)%2 == 0 {
 				parserLines = modbusrtu.RegisterParserLines(data)
-				slaveName, registerLines, values = decodeKnownRegisters(nport, summary.SlaveID, data)
+				slaveName, deviceType, registerLines, values = decodeKnownRegisters(nport, summary.SlaveID, data)
 			}
 		}
 	}
 	if recorder != nil && len(values) > 0 {
-		recorder.RecordFrame(nport, summary.SlaveID, slaveName, values, time.Now().UTC())
+		recorder.RecordFrame(nport, summary.SlaveID, slaveName, deviceType, values, time.Now().UTC())
 	}
 
 	header := fmt.Sprintf("[%s] frame: %s", nport.Name, modbusrtu.FormatSummary(summary))
