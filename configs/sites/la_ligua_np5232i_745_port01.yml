@@ -31,7 +31,7 @@ nports:
       - 7
       - 8
     slaves:
-      # kipp_zonen: 43 int16 registers, value0..value42.
+      # kipp_zonen: 43 raw uint16 registers, value0..value42.
       - name: piranometro_4
         address: 4
       - name: piranometro_5

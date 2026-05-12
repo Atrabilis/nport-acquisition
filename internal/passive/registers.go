@@ -124,7 +124,7 @@ func effectiveDeviceType(nport config.NPortConfig, slave config.SlaveConfig) str
 func defaultRegistersForDevice(deviceType string) []config.RegisterConfig {
 	switch normalizeDeviceType(deviceType) {
 	case "kipp_zonen":
-		return sequentialInt16Registers(43)
+		return sequentialUint16Registers(43)
 	default:
 		return nil
 	}
@@ -144,13 +144,13 @@ func normalizeDeviceType(deviceType string) string {
 	}
 }
 
-func sequentialInt16Registers(count int) []config.RegisterConfig {
+func sequentialUint16Registers(count int) []config.RegisterConfig {
 	registers := make([]config.RegisterConfig, 0, count)
 	for i := 0; i < count; i++ {
 		registers = append(registers, config.RegisterConfig{
 			Register:     i,
 			RegisterName: "value" + strconv.Itoa(i),
-			RegisterType: "int16",
+			RegisterType: "uint16",
 		})
 	}
 	return registers
