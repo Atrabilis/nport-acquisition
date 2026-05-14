@@ -76,13 +76,16 @@ func (o StorageOutputConfig) IsEnabled() bool {
 }
 
 type TimescaledbShadowConfig struct {
-	HostEnv     string `yaml:"host_env"`
-	PortEnv     string `yaml:"port_env"`
-	UserEnv     string `yaml:"user_env"`
-	PasswordEnv string `yaml:"password_env"`
-	DatabaseEnv string `yaml:"database_env"`
-	Schema      string `yaml:"schema"`
-	Table       string `yaml:"table"`
+	HostEnv     string   `yaml:"host_env"`
+	PortEnv     string   `yaml:"port_env"`
+	UserEnv     string   `yaml:"user_env"`
+	PasswordEnv string   `yaml:"password_env"`
+	DatabaseEnv string   `yaml:"database_env"`
+	Schema      string   `yaml:"schema"`
+	Table       string   `yaml:"table"`
+	DeviceTypes []string `yaml:"device_types,omitempty"`
+	SlaveNames  []string `yaml:"slave_names,omitempty"`
+	SlaveIDs    []uint8  `yaml:"slave_ids,omitempty"`
 }
 
 func Load(path string) (Config, error) {

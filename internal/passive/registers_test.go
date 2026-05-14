@@ -31,8 +31,8 @@ func TestDecodeKnownRegistersUsesKippZonenProfile(t *testing.T) {
 	if len(values) != 43 {
 		t.Fatalf("len(values) = %d, want 43", len(values))
 	}
-	if values[42].Register != 42 || values[42].Name != "value42" || values[42].Value != 42 {
-		t.Fatalf("values[42] = %#v, want register 42/value42/42", values[42])
+	if values[42].Register != 42 || values[42].Name != "value_42" || values[42].Value != 42 {
+		t.Fatalf("values[42] = %#v, want register 42/value_42/42", values[42])
 	}
 	if values[42].Type != "uint16" {
 		t.Fatalf("values[42].Type = %q, want uint16", values[42].Type)

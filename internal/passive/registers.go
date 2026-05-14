@@ -156,7 +156,7 @@ func sequentialUint16Registers(count int) []config.RegisterConfig {
 	for i := 0; i < count; i++ {
 		registers = append(registers, config.RegisterConfig{
 			Register:     i,
-			RegisterName: "value" + strconv.Itoa(i),
+			RegisterName: "value_" + strconv.Itoa(i),
 			RegisterType: "uint16",
 		})
 	}

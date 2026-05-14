@@ -24,9 +24,13 @@ var nonIdentChars = regexp.MustCompile(`[^a-z0-9_]+`)
 var multiUnderscore = regexp.MustCompile(`_+`)
 
 type TimescaleShadowWriter struct {
-	name string
-	fqn  string
-	pool *pgxpool.Pool
+	name         string
+	fqn          string
+	deviceTypes  map[string]struct{}
+	slaveNames   map[string]struct{}
+	slaveIDs     map[uint8]struct{}
+	hasAnyFilter bool
+	pool         *pgxpool.Pool
 }
 
 type ShadowRow struct {
@@ -70,9 +74,13 @@ func NewTimescaleShadowWriter(ctx context.Context, name string, cfg config.Times
 	}
 
 	return &TimescaleShadowWriter{
-		name: name,
-		fqn:  schema + "." + table,
-		pool: pool,
+		name:         name,
+		fqn:          schema + "." + table,
+		deviceTypes:  normalizedStringSet(cfg.DeviceTypes),
+		slaveNames:   normalizedStringSet(cfg.SlaveNames),
+		slaveIDs:     uint8Set(cfg.SlaveIDs),
+		hasAnyFilter: len(cfg.DeviceTypes) > 0 || len(cfg.SlaveNames) > 0 || len(cfg.SlaveIDs) > 0,
+		pool:         pool,
 	}, nil
 }
 
@@ -87,6 +95,29 @@ func (w *TimescaleShadowWriter) Close() {
 	if w != nil && w.pool != nil {
 		w.pool.Close()
 	}
+}
+
+func (w *TimescaleShadowWriter) Accepts(row ShadowRow) bool {
+	if w == nil || !w.hasAnyFilter {
+		return true
+	}
+	if len(w.deviceTypes) > 0 {
+		deviceType := strings.TrimSpace(row.Tags["device_type"])
+		if _, ok := w.deviceTypes[normalizeFilterToken(deviceType)]; !ok {
+			return false
+		}
+	}
+	if len(w.slaveNames) > 0 {
+		if _, ok := w.slaveNames[normalizeFilterToken(row.SlaveName)]; !ok {
+			return false
+		}
+	}
+	if len(w.slaveIDs) > 0 {
+		if _, ok := w.slaveIDs[row.SlaveID]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (w *TimescaleShadowWriter) Write(ctx context.Context, row ShadowRow) error {
@@ -135,6 +166,40 @@ func (w *TimescaleShadowWriter) Write(ctx context.Context, row ShadowRow) error 
 		return fmt.Errorf("upsert %s: %w", w.fqn, err)
 	}
 	return nil
+}
+
+func normalizedStringSet(values []string) map[string]struct{} {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		normalized := normalizeFilterToken(value)
+		if normalized == "" {
+			continue
+		}
+		out[normalized] = struct{}{}
+	}
+	return out
+}
+
+func uint8Set(values []uint8) map[uint8]struct{} {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[uint8]struct{}, len(values))
+	for _, value := range values {
+		out[value] = struct{}{}
+	}
+	return out
+}
+
+func normalizeFilterToken(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	normalized = strings.ReplaceAll(normalized, " ", "_")
+	normalized = multiUnderscore.ReplaceAllString(normalized, "_")
+	return strings.Trim(normalized, "_")
 }
 
 func buildSeriesMetadata(tags map[string]string) (string, map[string]string) {

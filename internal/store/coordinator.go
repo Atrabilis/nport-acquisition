@@ -19,6 +19,10 @@ type Writer interface {
 	Close()
 }
 
+type filteredWriter interface {
+	Accepts(row storage.ShadowRow) bool
+}
+
 type Coordinator struct {
 	plant    string
 	expected map[string]map[uint8]struct{}
@@ -156,6 +160,9 @@ func (c *Coordinator) flushLocked() {
 					"device_type": frame.deviceType,
 				},
 			}
+			if filter, ok := writer.(filteredWriter); ok && !filter.Accepts(row) {
+				continue
+			}
 			if err := writer.Write(context.Background(), row); err != nil {
 				fmt.Printf("[store] writer=%s port=%s slave=%d failed: %v\n", writer.Name(), frame.nport.Name, frame.slaveID, err)
 				continue
@@ -168,15 +175,33 @@ func (c *Coordinator) flushLocked() {
 func fieldsFromValues(values []passive.RegisterValue) map[string]interface{} {
 	fields := make(map[string]interface{}, len(values))
 	for _, value := range values {
-		if strings.TrimSpace(value.Name) == "" {
+		name := normalizeFieldName(value.Name)
+		if name == "" {
 			continue
 		}
 		switch strings.ToLower(strings.TrimSpace(value.Type)) {
 		case "float", "float32", "float64":
-			fields[value.Name] = value.Value
+			fields[name] = value.Value
 		default:
-			fields[value.Name] = int64(value.Value)
+			fields[name] = int64(value.Value)
 		}
 	}
 	return fields
+}
+
+func normalizeFieldName(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "value") && len(trimmed) > len("value") {
+		suffix := trimmed[len("value"):]
+		for _, ch := range suffix {
+			if ch < '0' || ch > '9' {
+				return trimmed
+			}
+		}
+		return "value_" + suffix
+	}
+	return trimmed
 }

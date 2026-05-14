@@ -20,6 +20,8 @@ storage:
         database_env: TIMESCALE_DB_LOCAL
         schema: edge
         table: petorca_stationmeteo_np1_shadow
+        device_types:
+          - kipp_zonen
 ```
 
 ## Fuente de verdad
