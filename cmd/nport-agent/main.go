@@ -54,13 +54,14 @@ func main() {
 
 	collector := passive.NewSlaveCollector()
 	var recorder passive.FrameRecorder
+	var coordinator *store.Coordinator
 	if storeMode {
 		writers, err := buildWriters(ctx, cfg)
 		if err != nil {
 			fmt.Printf("failed to initialize storage: %v\n", err)
 			os.Exit(1)
 		}
-		coordinator := store.NewCoordinator(cfg, writers, stop)
+		coordinator = store.NewCoordinator(cfg, writers, stop)
 		if coordinator == nil {
 			fmt.Println("failed to initialize storage: no writers or detected_slaves configured")
 			os.Exit(1)
@@ -83,6 +84,9 @@ func main() {
 	}
 
 	wg.Wait()
+	// The listeners stopped: write whatever was captured if the run ended
+	// before every expected slave was seen.
+	coordinator.FlushPending()
 	if err := writeDiscoveryReport(*outputDir, *configPath, collector); err != nil {
 		fmt.Printf("failed to write discovery report: %v\n", err)
 	}

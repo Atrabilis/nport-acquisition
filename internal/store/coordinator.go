@@ -120,6 +120,48 @@ func (c *Coordinator) RecordFrame(nport config.NPortConfig, slaveID uint8, slave
 	}
 }
 
+// FlushPending writes the slaves captured so far when the run ends before
+// every expected slave was seen (store_timeout_seconds or shutdown), and logs
+// the missing ones. Without it, one disconnected sensor lost the data of
+// every other sensor on the same port on every run.
+func (c *Coordinator) FlushPending() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done {
+		return
+	}
+	c.done = true
+
+	missing := strings.Join(c.missingLocked(), ", ")
+	captured := 0
+	for _, slaves := range c.last {
+		captured += len(slaves)
+	}
+	if captured == 0 {
+		fmt.Printf("[store] WARNING: run ended without capturing any expected slave; missing: %s\n", missing)
+		return
+	}
+	fmt.Printf("[store] WARNING: run ended before every expected slave was captured; writing %d captured, missing: %s\n", captured, missing)
+	c.flushLocked()
+}
+
+// missingLocked lists expected slaves not captured, as "port/slave_id".
+func (c *Coordinator) missingLocked() []string {
+	var missing []string
+	for port, expectedSlaves := range c.expected {
+		for slaveID := range expectedSlaves {
+			if _, ok := c.last[port][slaveID]; !ok {
+				missing = append(missing, fmt.Sprintf("%s/%d", port, slaveID))
+			}
+		}
+	}
+	sort.Strings(missing)
+	return missing
+}
+
 func (c *Coordinator) allSeenLocked() bool {
 	for port, expectedSlaves := range c.expected {
 		seen := c.last[port]

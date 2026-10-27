@@ -297,10 +297,10 @@ func TestE2EStoresOneRowPerExpectedSlave(t *testing.T) {
 	}
 }
 
-// Documents current behavior: when store_timeout_seconds runs out before every
-// expected slave was seen, nothing is written, not even the slaves that were
-// captured. Slave 3 never answers here.
-func TestE2EIncompleteCaptureWritesNothing(t *testing.T) {
+// When store_timeout_seconds runs out before every expected slave was seen,
+// the captured slaves are still written and the missing ones are logged.
+// Slave 3 never answers here; slaves 1 and 2 must not be lost because of it.
+func TestE2EIncompleteCaptureWritesCapturedSlaves(t *testing.T) {
 	e := setupNPortE2E(t)
 	port := startFakeNPort(t, busTraffic())
 
@@ -308,14 +308,23 @@ func TestE2EIncompleteCaptureWritesNothing(t *testing.T) {
 	if elapsed < 3*time.Second {
 		t.Fatalf("expected the run to wait for store_timeout_seconds, ended after %s\n%s", elapsed, out)
 	}
-	if !strings.Contains(out, "captured port=np_port02_piras slave=1") {
-		t.Fatalf("slave 1 should have been captured\n%s", out)
+	if !strings.Contains(out, "missing: np_port02_piras/3") {
+		t.Fatalf("the missing slave should be logged\n%s", out)
 	}
-	var n int
-	if err := e.conn.QueryRow(context.Background(), "SELECT count(*) FROM "+e.schema+".nport_kipp_zonen_shadow").Scan(&n); err != nil {
+	rows, err := e.conn.Query(context.Background(), "SELECT slave_name FROM "+e.schema+".nport_kipp_zonen_shadow ORDER BY slave_name")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 0 {
-		t.Fatalf("current behavior writes nothing on an incomplete capture, got %d rows", n)
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, name)
+	}
+	if strings.Join(got, ",") != "kipp_zonen_1,kipp_zonen_2" {
+		t.Fatalf("expected the two captured slaves to be written, got %v\n%s", got, out)
 	}
 }
