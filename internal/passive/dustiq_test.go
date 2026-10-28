@@ -41,11 +41,10 @@ func TestFrameDecoderEmitsDustIQCycleOnNextAnchor(t *testing.T) {
 	})
 
 	var values []RegisterValue
-	var decoderLines []string
 	for i := 0; i < dustIQExpectedFrames; i++ {
 		frame := dustIQTestFrame(1, uint16(800+i))
 		summary := modbusrtu.Summarize(frame)
-		_, _, _, values, decoderLines = decoder.DecodeFrame(summary, frame, frame[3:5])
+		_, _, _, values, _ = decoder.DecodeFrame(summary, frame, frame[3:5])
 		if len(values) != 0 {
 			t.Fatalf("unexpected values before next anchor at frame %d", i)
 		}

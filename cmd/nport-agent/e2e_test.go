@@ -71,7 +71,7 @@ func startFakeNPort(t *testing.T, script []busChunk) int {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() { _ = ln.Close() })
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -79,7 +79,7 @@ func startFakeNPort(t *testing.T, script []busChunk) int {
 				return
 			}
 			go func(c net.Conn) {
-				defer c.Close()
+				defer func() { _ = c.Close() }()
 				for {
 					for _, chunk := range script {
 						if _, err := c.Write(chunk.data); err != nil {
@@ -132,7 +132,7 @@ func setupNPortE2E(t *testing.T) *nportE2E {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	t.Cleanup(func() { conn.Close(context.Background()) })
+	t.Cleanup(func() { _ = conn.Close(context.Background()) })
 
 	schema := fmt.Sprintf("e2e_%d", time.Now().UnixNano())
 	if _, err := conn.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
