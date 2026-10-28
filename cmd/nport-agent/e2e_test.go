@@ -145,6 +145,11 @@ func setupNPortE2E(t *testing.T) *nportE2E {
 
 	bin := filepath.Join(t.TempDir(), "nport-agent")
 	args := []string{"build", "-o", bin}
+	// E2E_RACE=1 (set in CI) builds the binary with the race detector, so a
+	// data race in the program itself fails the test, not only one in test code.
+	if os.Getenv("E2E_RACE") != "" {
+		args = append(args, "-race")
+	}
 	if os.Getenv("NPORT_E2E_COVERDIR") != "" {
 		args = append(args, "-cover", "-coverpkg=github.com/Atrabilis/nport-acquisition/...")
 	}
